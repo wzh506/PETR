@@ -480,12 +480,13 @@ class PETRv2Head(AnchorFreeHead):
                 pos_embed = torch.cat(pos_embeds, 1)
         
 
-        reference_points = self.reference_points.weight
+        reference_points = self.reference_points.weight #不同于seg是采用网格均匀初始化，这个是随机初始化的
         query_embeds = self.query_embedding(pos2posemb3d(reference_points))
         reference_points = reference_points.unsqueeze(0).repeat(batch_size, 1, 1) #.sigmoid()
-        outs_dec, _ = self.transformer(x, masks, query_embeds, pos_embed, self.reg_branches)
+        # outs_dec, _ = self.transformer(x, masks, query_embeds, pos_embed, self.reg_branches) #原版
+        outs_dec, _ = self.transformer(x, masks, query_embeds, pos_embed, None)
         outs_dec = torch.nan_to_num(outs_dec)
-        
+        # det的bev feature大小为torch.Size([6, 1, 900, 256])
         if self.with_time:
             time_stamps = []
             for img_meta in img_metas:    
@@ -493,15 +494,15 @@ class PETRv2Head(AnchorFreeHead):
             time_stamp = x.new_tensor(time_stamps)
             time_stamp = time_stamp.view(batch_size, -1, 6)
             mean_time_stamp = (time_stamp[:, 1, :] - time_stamp[:, 0, :]).mean(-1)
-        
+            # 平均的时间差，每个相机时间戳都有点不一样
         outputs_classes = []
         outputs_coords = []
         for lvl in range(outs_dec.shape[0]):
             reference = inverse_sigmoid(reference_points.clone())
             assert reference.shape[-1] == 3
             outputs_class = self.cls_branches[lvl](outs_dec[lvl])
-            tmp = self.reg_branches[lvl](outs_dec[lvl])
-
+            tmp = self.reg_branches[lvl](outs_dec[lvl]) #应该是这里采用，上面大概没用
+            # 为什么要加这个可学习的bbox呢？
             tmp[..., 0:2] += reference[..., 0:2]
             tmp[..., 0:2] = tmp[..., 0:2].sigmoid()
             tmp[..., 4:5] += reference[..., 2:3]

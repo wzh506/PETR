@@ -1,0 +1,184 @@
+import torch
+from mmcv import Config
+from mmcv.parallel import MMDataParallel
+from mmcv.runner import load_checkpoint
+from mmdet3d.datasets import build_dataloader, build_dataset
+from mmdet3d.models import build_detector
+
+import os
+import importlib
+import matplotlib.pyplot as plt
+import torchvision
+import numpy as np
+import cv2
+import torch.nn as nn
+from PIL import Image
+import torch.nn.functional as F 
+import matplotlib
+from PIL import ImageDraw
+
+
+class Visualizer:
+
+    def __init__(self,
+                 cfg,
+                 checkpoint=None) -> None:
+        self.cfg = Config.fromfile(cfg)
+        self.save_dir = './tmp'
+        self.init()
+        self.model = self._build_model(checkpoint)
+        self.dataset = self._build_dataset()
+
+    def init(self):
+        self.cfg.model.pretrained = None
+        self.cfg.data.test.test_mode = True
+        plugin_dir = self.cfg.plugin_dir
+        _module_dir = os.path.dirname(plugin_dir)
+        _module_dir = _module_dir.split('/')
+        _module_path = _module_dir[0]
+        for m in _module_dir[1:]:
+            _module_path = _module_path + '.' + m
+        print(_module_path)
+        plg_lib = importlib.import_module(_module_path)
+
+    def _build_model(self, checkpoint=None):
+        model = build_detector(self.cfg.model, test_cfg=self.cfg.get('test_cfg'))
+        if checkpoint:
+            load_checkpoint(model, checkpoint, map_location='cpu')
+        model = MMDataParallel(model, device_ids=[0])
+        model.eval()
+        return model
+    
+    def _build_dataset(self):
+        dataset = build_dataset(self.cfg.data.val)
+        return dataset
+
+    def vis_attn(self, eps=1e-5, sampled_num=10):
+        data_loader = build_dataloader(
+            self.dataset,
+            samples_per_gpu=1,
+            workers_per_gpu=self.cfg.data.workers_per_gpu,
+            dist=False,
+            shuffle=False)
+        loader = iter(data_loader)
+        petr_out = []
+        hook = [self.model.module.pts_bbox_head.register_forward_hook(
+                lambda self, input, output: petr_out.append(output))]
+        memory = []
+        hook = [self.model.module.pts_bbox_head.transformer.decoder.layers[i].attentions[1].attn.register_forward_hook(
+                lambda self, input, output: memory.append(output)) for i in range(6)]
+        
+        coords3d = self.model.module.pts_bbox_head.reference_points.weight.clone().detach() 
+        pc_range = self.model.module.pts_bbox_head.bbox_coder.pc_range
+        coords3d[..., 0:1] = coords3d[..., 0:1] * (pc_range[3] - pc_range[0]) + pc_range[0]
+        coords3d[..., 1:2] = coords3d[..., 1:2] * (pc_range[4] - pc_range[1]) + pc_range[1]
+        coords3d[..., 2:3] = coords3d[..., 2:3] * (pc_range[5] - pc_range[2]) + pc_range[2]
+        coords3d  = torch.cat((coords3d, torch.ones_like(coords3d [..., :1])), -1)
+        coords3d = coords3d.unsqueeze(0).repeat(6, 1, 1).unsqueeze(-1)
+
+        for data_id in range(30):
+            memory = []
+            petr_out = []
+            data = next(loader)
+            with torch.no_grad():
+                out = self.model(**data, return_loss=False)
+
+            img_h, img_w = data['img'][0].data[0][0][0].size()[1:]
+            query_bbox5 = torch.cat([petr_out[0][0][0]["center"][-1], petr_out[0][0][0]["height"][-1]], dim=-1)
+            query_bbox1 = torch.cat([petr_out[0][0][0]["center"][0], petr_out[0][0][0]["height"][0]], dim=-1)
+
+            query_bbox5 = torch.cat([query_bbox5, torch.ones_like(query_bbox5[..., :1])], -1)
+            query_bbox1 = torch.cat([query_bbox1, torch.ones_like(query_bbox1[..., :1])], -1)
+
+
+            img_metas = data['img_metas'][0].data[0]
+            lidar2img = []
+            for img_meta in img_metas:
+                    lidar2img.append(img_meta['lidar2img'])
+            lidar2img = np.asarray(lidar2img)
+            lidar2img = coords3d.new_tensor(lidar2img) # (B, N, 4, 4)
+            lidar2img = lidar2img.view(6, 4, 4).unsqueeze(1).repeat(1, 900, 1, 1)
+
+            query_bbox5 = query_bbox5.repeat(6, 1, 1).unsqueeze(-1)
+            query_bbox1 = query_bbox1.repeat(6, 1, 1).unsqueeze(-1)
+
+            reference_points_cam = torch.matmul(lidar2img, coords3d).squeeze(-1)
+            query_bbox5_cam = torch.matmul(lidar2img, query_bbox5).squeeze(-1)
+            query_bbox5_cam = query_bbox5_cam[..., 0:2] / torch.maximum(
+                    query_bbox5_cam[..., 2:3], torch.ones_like(query_bbox5_cam[..., 2:3])*eps)
+            query_bbox1_cam = torch.matmul(lidar2img, query_bbox1).squeeze(-1)
+            query_bbox1_cam = query_bbox1_cam[..., 0:2] / torch.maximum(
+                    query_bbox1_cam[..., 2:3], torch.ones_like(query_bbox1_cam[..., 2:3])*eps)
+
+            ref_mask = reference_points_cam[:, :, 2:3] > eps
+            reference_points_cam = reference_points_cam[..., 0:2] / torch.maximum(
+                    reference_points_cam[..., 2:3], torch.ones_like(reference_points_cam[..., 2:3])*eps)
+            ref_mask = ref_mask & (reference_points_cam[..., 0:1] > 0.0) & (reference_points_cam[..., 1:2] > 0.0) \
+            & (reference_points_cam[..., 0:1] < img_w) & (reference_points_cam[..., 1:2] < img_h)
+
+            query_score = petr_out[0][0][0]["cls_logits"][-1].sigmoid().max(-1).values
+            attention_score = torch.stack([memory[i][1] for i in range(6)], dim=1)
+            attention_score = attention_score.sum(1).squeeze(0).cpu()
+
+
+            sampled = torch.topk(query_score, sampled_num, dim=-1)
+            attention_score_mask = attention_score[sampled.indices[0][:]][:, -6*img_h*img_w//256:].reshape(sampled_num, 6, img_h//16, img_w//16).max(dim=0).values
+            attention_score_mask = (attention_score_mask[..., None] - attention_score_mask.min()) / (attention_score_mask.max() - attention_score_mask.min())
+
+            ################## draw pc
+            pc_attn_score_mask = attention_score[sampled.indices[0][:]][:, :-6*img_h*img_w//256].reshape(
+                sampled_num, int((pc_range[3] - pc_range[0]) / self.cfg.voxel_size[0] / self.cfg.out_size_factor), 
+                int((pc_range[4] - pc_range[1]) / self.cfg.voxel_size[1] / self.cfg.out_size_factor) ).max(dim=0).values
+            pc_attn_score_mask = (pc_attn_score_mask[..., None] - pc_attn_score_mask.min()) / (pc_attn_score_mask.max() - pc_attn_score_mask.min())
+
+            ch, cw = int(pc_range[3]) * 10, int(pc_range[4]) * 10
+            cavas = np.zeros((ch, cw, 3))
+
+            points = data['points'][0].data[0][0]
+            for p in points:
+                ph = ch - (p[0] - pc_range[0]) / (pc_range[3] - pc_range[0]) * ch
+                pw = (p[1] - pc_range[1]) / (pc_range[4] - pc_range[1]) * cw
+                cv2.circle(cavas, (int(ph), int(pw)), 1, (0, 155, 128))
+
+            pc_attn_score_mask = cv2.resize(pc_attn_score_mask.numpy(), (ch, cw))
+            plt.figure(figsize=(24, 24))
+            plt.imshow(cavas / 255.0)
+            plt.imshow(pc_attn_score_mask, alpha=0.4, cmap="jet")
+            
+            coords3d_cpu, query_bbox5_cpu = coords3d.cpu(), query_bbox5.cpu()
+            for k in range(10):
+                    if query_score[0, sampled.indices[0][k]] > 0.5:
+                            plt.scatter((coords3d_cpu[0][sampled.indices[0][k]][0] + pc_range[3]) * 5.0, (coords3d_cpu[0][sampled.indices[0][k]][1] + pc_range[3]) * 5.0, s=300, alpha=1.0, c = 'b')
+                            plt.scatter((query_bbox5_cpu[0][sampled.indices[0][k]][0] + pc_range[3]) * 5.0, (query_bbox5_cpu[0][sampled.indices[0][k]][1] + pc_range[3]) * 5.0, s=300, alpha=1.0, c = 'r')
+            plt.savefig(f"./tmp/attn_map_{data_id}_pc.jpg")
+
+            ################## draw img
+            for j in range(6):
+                    plt.figure(figsize=(24, 8))
+
+                    mean = torch.tensor([103.530, 116.280, 123.675])[None, None, :]
+                    std = torch.tensor([57.375, 57.120, 58.395])[None, None, :]
+
+                    img = data['img'][0].data[0][0][j].permute(1, 2, 0) * std + mean
+                    img = cv2.cvtColor(np.asarray(img), cv2.COLOR_BGR2RGB)
+                    mask = cv2.resize(attention_score_mask[j].numpy(), (img_w, img_h))
+                    # mask = (mask[..., None] - mask.min()) / (mask.max() - mask.min())
+
+                    plt.imshow(img / 255.0)
+                    plt.imshow(mask, alpha=0.4, cmap="jet")
+
+                    reference_points_cam_cpu, query_bbox5_cam_cpu = reference_points_cam.cpu(), query_bbox5_cam.cpu()
+                    for k in range(10):
+                            if ref_mask[j][sampled.indices[0][k]] and query_score[0, sampled.indices[0][k]] > 0.5:
+                                    plt.scatter(reference_points_cam_cpu[j][sampled.indices[0][k]][0], reference_points_cam_cpu[j][sampled.indices[0][k]][1], s=300, alpha=1.0, c = 'b')
+                                    plt.scatter(query_bbox5_cam_cpu[j][sampled.indices[0][k]][0], query_bbox5_cam_cpu[j][sampled.indices[0][k]][1], s=300, alpha=1.0, c = 'r')
+
+                    plt.savefig(f'./tmp/attn_map_{data_id}_{j}.jpg')
+
+
+if __name__ == '__main__':
+    visualizer = Visualizer(
+        cfg='projects/configs/CMT/cmt_pillar_r50_704x256.py',
+        checkpoint='work_dirs/cmt_pillar_r50_704x256/epoch_20.pth'
+    )
+    visualizer.vis_attn()

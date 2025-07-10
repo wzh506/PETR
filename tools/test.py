@@ -100,6 +100,7 @@ def parse_args():
 
 
 def main():
+    torch.multiprocessing.set_start_method('fork')
     args = parse_args()
 
     assert args.out or args.eval or args.format_only or args.show \

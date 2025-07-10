@@ -101,6 +101,7 @@ def parse_args():
 
 
 def main():
+    torch.multiprocessing.set_start_method('fork')
     args = parse_args()
 
     cfg = Config.fromfile(args.config)
@@ -213,11 +214,12 @@ def main():
     model = build_model(
         cfg.model,
         train_cfg=cfg.get('train_cfg'),
-        test_cfg=cfg.get('test_cfg'))
+        test_cfg=cfg.get('test_cfg')) #这里构建模型
     model.init_weights()
 
     logger.info(f'Model:\n{model}')
-    datasets = [build_dataset(cfg.data.train)]
+    print(f'cfg.data.train: {cfg.data.train}')
+    datasets = [build_dataset(cfg.data.train)] #这里构建数据集
     if len(cfg.workflow) == 2:
         val_dataset = copy.deepcopy(cfg.data.val)
         # in case we use a dataset wrapper

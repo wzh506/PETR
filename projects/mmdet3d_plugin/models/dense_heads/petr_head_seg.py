@@ -46,7 +46,7 @@ def pos2posemb2d(pos, num_pos_feats=128, temperature=10000):
     scale = 2 * math.pi
     pos = pos * scale
     dim_t = torch.arange(num_pos_feats, dtype=torch.float32, device=pos.device)
-    dim_t = temperature ** (2 * (dim_t // 2) / num_pos_feats)
+    dim_t = temperature ** (2 * (dim_t // 2) / num_pos_feats) #严格来说这里似乎不应该//2
     pos_x = pos[..., 0, None] / dim_t
     pos_y = pos[..., 1, None] / dim_t
     # pos_z = pos[..., 2, None] / dim_t
@@ -394,10 +394,10 @@ class PETRHead_seg(AnchorFreeHead):
         pad_h, pad_w, _ = img_metas[0]['pad_shape'][0]
         
         B, N, C, H, W = img_feats[self.position_level].shape
-        coords_h = torch.arange(H, device=img_feats[0].device).float() * pad_h / H
+        coords_h = torch.arange(H, device=img_feats[0].device).float() * pad_h / H #乘以放大倍数？
         coords_w = torch.arange(W, device=img_feats[0].device).float() * pad_w / W
 
-        if self.LID:
+        if self.LID:#Linear Increasing Discretization,提升近距离分辨率
             index  = torch.arange(start=0, end=self.depth_num, step=1, device=img_feats[0].device).float()
             index_1 = index + 1
             bin_size = (self.position_range[3] - self.depth_start) / (self.depth_num * (1 + self.depth_num))
@@ -407,16 +407,16 @@ class PETRHead_seg(AnchorFreeHead):
             bin_size = (self.position_range[3] - self.depth_start) / self.depth_num
             coords_d = self.depth_start + bin_size * index
 
-        D = coords_d.shape[0]
+        D = coords_d.shape[0]# torch.meshgrid有3个网格
         coords = torch.stack(torch.meshgrid([coords_w, coords_h, coords_d])).permute(1, 2, 3, 0) # W, H, D, 3
         coords = torch.cat((coords, torch.ones_like(coords[..., :1])), -1)
         coords[..., :2] = coords[..., :2] * torch.maximum(coords[..., 2:3], torch.ones_like(coords[..., 2:3])*eps)
-
+        # 感觉这里不太对，为什么是 * ?
         img2lidars = []
         for img_meta in img_metas:
             img2lidar = []
             for i in range(len(img_meta['lidar2img'])):
-                img2lidar.append(np.linalg.inv(img_meta['lidar2img'][i]))
+                img2lidar.append(np.linalg.inv(img_meta['lidar2img'][i])) #变为img2lidar
             img2lidars.append(np.asarray(img2lidar))
         img2lidars = np.asarray(img2lidars)
         img2lidars = coords.new_tensor(img2lidars) # (B, N, 4, 4)
@@ -428,7 +428,7 @@ class PETRHead_seg(AnchorFreeHead):
         coords3d[..., 1:2] = (coords3d[..., 1:2] - self.position_range[1]) / (self.position_range[4] - self.position_range[1])
         coords3d[..., 2:3] = (coords3d[..., 2:3] - self.position_range[2]) / (self.position_range[5] - self.position_range[2])
 
-        coords_mask = (coords3d > 1.0) | (coords3d < 0.0) 
+        coords_mask = (coords3d > 1.0) | (coords3d < 0.0)  #不在有效范围内为True
         coords_mask = coords_mask.flatten(-2).sum(-1) > (D * 0.5)
         coords_mask = masks | coords_mask.permute(0, 1, 3, 2)
         coords3d = coords3d.permute(0, 1, 4, 5, 3, 2).contiguous().view(B*N, -1, H, W)
@@ -492,29 +492,29 @@ class PETRHead_seg(AnchorFreeHead):
 
         input_img_h, input_img_w, _ = img_metas[0]['pad_shape'][0]
         masks = x.new_ones(
-            (batch_size, num_cams, input_img_h, input_img_w))
+            (batch_size, num_cams, input_img_h, input_img_w))#创建一个原图大小全为1的变量
         for img_id in range(batch_size):
             for cam_id in range(num_cams):
                 img_h, img_w, _ = img_metas[img_id]['img_shape'][cam_id]
-                masks[img_id, cam_id, :img_h, :img_w] = 0
+                masks[img_id, cam_id, :img_h, :img_w] = 0 #只有这些有效对吗？
             
         x = self.input_proj(x.flatten(0,1))
         x = x.view(batch_size, num_cams, *x.shape[-3:])
 
         # interpolate masks to have the same spatial shape with x
         masks = F.interpolate(
-            masks, size=x.shape[-2:]).to(torch.bool)
+            masks, size=x.shape[-2:]).to(torch.bool) #缩放那个特征图,原来可以向下插值
 
-        if self.with_position:
-            coords_position_embeding, _ = self.position_embeding(mlvl_feats, img_metas, masks)
+        if self.with_position: #从这里进入主线
+            coords_position_embeding, _ = self.position_embeding(mlvl_feats, img_metas, masks)#这个像是petr的
             
-            if self.with_se:
+            if self.with_se:#位置编码+2D特征
                 coords_position_embeding = self.se(coords_position_embeding.flatten(0,1), x.flatten(0,1)).view(x.size())
 
             pos_embed = coords_position_embeding
 
             if self.with_multiview:
-                sin_embed = self.positional_encoding(masks)
+                sin_embed = self.positional_encoding(masks) #这是是否超出pad的mask,sincos位置编码经典
                 sin_embed = self.adapt_pos3d(sin_embed.flatten(0, 1)).view(x.size())
                 pos_embed = pos_embed + sin_embed
             else:
@@ -536,9 +536,9 @@ class PETRHead_seg(AnchorFreeHead):
                     pos_embeds.append(pos_embed.unsqueeze(1))
                 pos_embed = torch.cat(pos_embeds, 1)
         
-        
+        # generate query，虽然是使用位置编码，但是实际上是一个查询向量,这里比较奇怪，输入tensor为什么能够运行？
         query_lane=self.query_embedding_lane(pos2posemb2d(self.reference_points_lane))
-
+        # 但是这个直接使用pos作为query来初始化吗？这样query完全就是靠embedding学习
         
         outs_dec_lane, _ = self.transformer_lane(x, masks, query_lane, pos_embed, self.lane_branches_dri)
         outs_dec_lane = torch.nan_to_num(outs_dec_lane)
@@ -554,17 +554,17 @@ class PETRHead_seg(AnchorFreeHead):
             time_stamp = x.new_tensor(time_stamps)
             time_stamp = time_stamp.view(batch_size, -1, 6)
             mean_time_stamp = (time_stamp[:, 1, :] - time_stamp[:, 0, :]).mean(-1)
-            
+            # 然而最后都没有用上，可能在det分支？
         
         outputs_classes = []
         outputs_coords = []
         outputs_lanes=[]
-        for lvl in range(outs_dec_lane.shape[0]):
-            
+        for lvl in range(outs_dec_lane.shape[0]): #观看最后的输出
+            # 这里三个head注意一下
             lane_queries_lvl=lane_queries[lvl].view(1,25,25,-1).permute(0,3,1,2)
-            outputs_dri=self.lane_branches_dri[lvl](lane_queries_lvl)
-            outputs_lan=self.lane_branches_lan[lvl](lane_queries_lvl)
-            outputs_vie=self.lane_branches_vie[lvl](lane_queries_lvl)
+            outputs_dri=self.lane_branches_dri[lvl](lane_queries_lvl) #可行驶区域
+            outputs_lan=self.lane_branches_lan[lvl](lane_queries_lvl) #车道线
+            outputs_vie=self.lane_branches_vie[lvl](lane_queries_lvl) #车辆
             
             outputs_lane=torch.cat([outputs_dri,outputs_lan,outputs_vie],dim=1)
             outputs_lane=outputs_lane.view(-1,3,200*200)

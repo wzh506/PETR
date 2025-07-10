@@ -87,7 +87,7 @@ class PETRTransformer(BaseModule):
                 - memory: Output results from encoder, with shape \
                       [bs, embed_dims, h, w].
         """
-        bs, n, c, h, w = x.shape
+        bs, n, c, h, w = x.shape #memory充当value
         memory = x.permute(1, 3, 4, 0, 2).reshape(-1, bs, c) # [bs, n, c, h, w] -> [n*h*w, bs, c]
         pos_embed = pos_embed.permute(1, 3, 4, 0, 2).reshape(-1, bs, c) # [bs, n, c, h, w] -> [n*h*w, bs, c]
         query_embed = query_embed.unsqueeze(1).repeat(
@@ -97,16 +97,16 @@ class PETRTransformer(BaseModule):
 
         # out_dec: [num_layers, num_query, bs, dim]
         out_dec = self.decoder(
-            query=target,
-            key=memory,
-            value=memory,
-            key_pos=pos_embed,
-            query_pos=query_embed,
-            key_padding_mask=mask,
-            reg_branch=reg_branch,
+            query=target, #用于保存
+            key=memory, #反了吧，key是特征数据
+            value=memory, # value还是特征数据
+            key_pos=pos_embed, # 仅用于3D Points的
+            query_pos=query_embed, # query，Seg queries
+            key_padding_mask=mask, # mask用于padding
+            reg_branch=reg_branch, # 这个有啥用
             )
         out_dec = out_dec.transpose(1, 2)
-        memory = memory.reshape(n, h, w, bs, c).permute(3, 0, 4, 1, 2)
+        memory = memory.reshape(n, h, w, bs, c).permute(3, 0, 4, 1, 2)#应该没有变化吧
         return  out_dec, memory
 
 @TRANSFORMER.register_module()
@@ -220,7 +220,7 @@ class PETRTransformerDecoderLayer(BaseTransformerLayer):
                  with_cp=True,
                  **kwargs):
         super(PETRTransformerDecoderLayer, self).__init__(
-            attn_cfgs=attn_cfgs,
+            attn_cfgs=attn_cfgs, #原来还可以自己定义
             feedforward_channels=feedforward_channels,
             ffn_dropout=ffn_dropout,
             operation_order=operation_order,
@@ -247,7 +247,7 @@ class PETRTransformerDecoderLayer(BaseTransformerLayer):
         Returns:
             Tensor: forwarded results with shape [num_query, bs, embed_dims].
         """
-        x = super(PETRTransformerDecoderLayer, self).forward(
+        x = super(PETRTransformerDecoderLayer, self).forward( #运行父类的forward函数
                 query,
                 key=key,
                 value=value,
@@ -258,7 +258,7 @@ class PETRTransformerDecoderLayer(BaseTransformerLayer):
                 key_padding_mask=key_padding_mask,
                 )
 
-        return x
+        return x #所以这个其实就是六层BaseTransformerDecoderLayer,666
 
     def forward(self, 
                 query,
@@ -474,7 +474,7 @@ class PETRTransformerEncoder(TransformerLayerSequence):
             x = self.post_norm(x)
         return x
 
-
+# 这个和DETR的Decoder基本没有区别
 @TRANSFORMER_LAYER_SEQUENCE.register_module()
 class PETRTransformerDecoder(TransformerLayerSequence):
     """Implements the decoder in DETR transformer.
@@ -513,9 +513,9 @@ class PETRTransformerDecoder(TransformerLayerSequence):
             if self.post_norm:
                 x = self.post_norm(x)[None]
             return x
-
+        # 感觉那个brach没有用到
         intermediate = []
-        for layer in self.layers:
+        for layer in self.layers: #感觉kwargs['reg_branch']没有用到
             query = layer(query, *args, **kwargs)
             if self.return_intermediate:
                 if self.post_norm is not None:

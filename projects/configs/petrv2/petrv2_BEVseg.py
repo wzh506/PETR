@@ -9,6 +9,24 @@ backbone_norm_cfg = dict(type='LN', requires_grad=True)
 plugin=True
 plugin_dir='projects/mmdet3d_plugin/'
 
+
+version = 'v1.0-mini'
+
+if version == 'v1.0-mini':
+    info_root = 'HDmaps-final_infos_train.pkl'
+    ann_file = 'mmdet3d_nuscenes_30f_infos_train.pkl'
+    lane_ann_file = 'HDmaps-final_infos_train.pkl'
+    val_ann_file = 'mmdet3d_nuscenes_30f_infos_val.pkl'
+    val_lane_file = 'HDmaps-final_infos_val.pkl'
+else: #说明用的是full!
+    info_root= 'HDmaps-nocover_infos_train.pkl' #这个是加入了val测试集作为训练的pkl，一般情况下用不到这个（除非要上传获得test指标）
+    ann_file = 'mmdet3d_nuscenes_30f_infos_train.pkl'
+    lane_ann_file = 'HDmaps-final_infos_train.pkl'
+    val_ann_file = 'mmdet3d_nuscenes_30f_infos_val.pkl'
+    val_lane_file = 'HDmaps-final_infos_val.pkl'
+    
+
+
 # If point cloud range is changed, the models should also change their point
 # cloud range accordingly
 point_cloud_range = [-51.2, -51.2, -5.0, 51.2, 51.2, 3.0]
@@ -21,7 +39,7 @@ class_names = [
     'motorcycle', 'bicycle', 'pedestrian', 'traffic_cone'
 ]
 input_modality = dict(
-    use_lidar=True,
+    use_lidar=True, #what the hell?
     use_camera=True,
     use_radar=False,
     use_map=False,
@@ -161,13 +179,14 @@ model = dict(
             pc_range=point_cloud_range))))
 
 dataset_type = 'MultiCustomNuScenesDataset'
-data_root = '/data/Dataset/nuScenes/'
+# data_root = '/data/Dataset/nuScenes/'
+data_root = 'data/nuscenes/'
 
 file_client_args = dict(backend='disk')
 
 db_sampler = dict(
     data_root=data_root,
-    info_path=data_root + 'HDmaps-nocover_infos_train.pkl',
+    info_path=data_root + info_root,
     rate=1.0,
     prepare=dict(
         filter_by_difficulty=[-1],
@@ -272,13 +291,13 @@ test_pipeline = [
 
 data = dict(
     samples_per_gpu=1,
-    workers_per_gpu=2,
+    workers_per_gpu=0, #有两个subprocess
     train=dict(
         type=dataset_type,
         data_root=data_root,
         
-        ann_file=data_root + 'mmdet3d_nuscenes_30f_infos_train.pkl',
-        lane_ann_file=data_root + 'HDmaps-final_infos_train.pkl',
+        ann_file=data_root + ann_file,
+        lane_ann_file=data_root + lane_ann_file,
         pipeline=train_pipeline,
         classes=class_names,
         modality=input_modality,
@@ -287,8 +306,8 @@ data = dict(
         # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
         # and box_type_3d='Depth' in sunrgbd and scannet dataset.
         box_type_3d='LiDAR'),
-    val=dict(type=dataset_type, pipeline=test_pipeline, ann_file=data_root + 'mmdet3d_nuscenes_30f_infos_val.pkl',lane_ann_file=data_root + 'HDmaps-final_infos_val.pkl', classes=class_names, modality=input_modality),
-    test=dict(type=dataset_type, pipeline=test_pipeline, ann_file=data_root + 'mmdet3d_nuscenes_30f_infos_val.pkl',lane_ann_file=data_root + 'HDmaps-final_infos_val.pkl', classes=class_names, modality=input_modality))
+    val=dict(type=dataset_type, pipeline=test_pipeline, ann_file=data_root + val_ann_file,lane_ann_file=data_root + val_lane_file, classes=class_names, modality=input_modality),
+    test=dict(type=dataset_type, pipeline=test_pipeline, ann_file=data_root + val_ann_file,lane_ann_file=data_root + val_lane_file, classes=class_names, modality=input_modality))
 
 
 optimizer = dict(

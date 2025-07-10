@@ -11,20 +11,25 @@ import os
 import mmcv
 import tqdm
 sensors = ['CAM_FRONT', 'CAM_FRONT_RIGHT', 'CAM_BACK_RIGHT', 'CAM_BACK', 'CAM_BACK_LEFT', 'CAM_FRONT_LEFT']
-info_prefix = 'train'
+# info_prefix = 'train'
 # info_prefix = 'val'
 # info_prefix = 'test'
-data_root = "/data/Dataset/nuScenes/"
+info_prefix = 'mini'  ###choose the dataset to generate sweep pkl, mini, train, val, test
+data_root = "data/nuscenes/"
 num_prev = 5  ###nummber of previous key frames
 num_sweep = 5  ###nummber of sweep frames between two key frame
 
 # info_path = os.path.join(data_root,'nuscenes_infos_30f_infos_{}.pkl'.format(info_prefix))
 info_path = os.path.join(data_root,'mmdet3d_nuscenes_30f_infos_{}.pkl'.format(info_prefix))
-key_infos = pickle.load(open(os.path.join(data_root,'nuscenes_infos_{}.pkl'.format(info_prefix)), 'rb'))
+# key_infos = pickle.load(open(os.path.join(data_root,'nuscenes_infos_{}.pkl'.format(info_prefix)), 'rb'))
+key_infos = pickle.load(open(os.path.join(data_root,'nuscenes_infos_train.pkl'), 'rb'))
+
 if info_prefix == 'test':
     nuscenes_version = 'v1.0-test'
-else:
+elif info_prefix == 'train':
     nuscenes_version = 'v1.0-trainval'
+elif info_prefix == 'mini':
+    nuscenes_version = 'v1.0-mini'  
 nuscenes = NuScenes(nuscenes_version, data_root)
 
 def add_frame(sample_data, e2g_t, l2e_t, l2e_r_mat, e2g_r_mat):

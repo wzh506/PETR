@@ -6,6 +6,23 @@ backbone_norm_cfg = dict(type='LN', requires_grad=True)
 plugin=True
 plugin_dir='projects/mmdet3d_plugin/'
 
+
+version = 'v1.0-mini'
+
+if version == 'v1.0-mini':
+    info_root = 'HDmaps-final_infos_train.pkl'
+    ann_file = 'mmdet3d_nuscenes_30f_infos_train.pkl'
+    lane_ann_file = 'HDmaps-final_infos_train.pkl'
+    val_ann_file = 'mmdet3d_nuscenes_30f_infos_val.pkl'
+    val_lane_file = 'HDmaps-final_infos_val.pkl'
+else: #说明用的是full!
+    info_root= 'HDmaps-nocover_infos_train.pkl'
+    ann_file = 'mmdet3d_nuscenes_30f_infos_train.pkl'
+    lane_ann_file = 'HDmaps-final_infos_train.pkl'
+    val_ann_file = 'mmdet3d_nuscenes_30f_infos_val.pkl'
+    val_lane_file = 'HDmaps-final_infos_val.pkl'
+
+
 # If point cloud range is changed, the models should also change their point
 # cloud range accordingly
 point_cloud_range = [-51.2, -51.2, -5.0, 51.2, 51.2, 3.0]
@@ -108,13 +125,14 @@ model = dict(
             pc_range=point_cloud_range))))
 
 dataset_type = 'CustomNuScenesDataset'
-data_root = '/data/Dataset/nuScenes/'
+data_root = './data/nuscenes/'
 
 file_client_args = dict(backend='disk')
 
 db_sampler = dict(
     data_root=data_root,
-    info_path=data_root + 'nuscenes_dbinfos_train.pkl',
+    # info_path=data_root + 'nuscenes_dbinfos_train.pkl',
+    info_path=data_root + info_root,
     rate=1.0,
     prepare=dict(
         filter_by_difficulty=[-1],
@@ -155,7 +173,7 @@ ida_aug_conf = {
         "H": 900,
         "W": 1600,
         "rand_flip": True,
-    }
+    } #使用多帧的sweeps来融合时序信息对吗
 train_pipeline = [
     dict(type='LoadMultiViewImageFromFiles', to_float32=True),
     dict(type='LoadMultiViewImageFromMultiSweepsFiles', sweeps_num=1, to_float32=True, pad_empty_sweeps=True, test_mode=False, sweep_range=[3,27]),
@@ -203,7 +221,7 @@ test_pipeline = [
 
 data = dict(
     samples_per_gpu=1,
-    workers_per_gpu=4,
+    workers_per_gpu=0,
     train=dict(
         type=dataset_type,
         data_root=data_root,

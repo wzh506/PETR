@@ -1,0 +1,26 @@
+1.环境配置问题
+经典配置mmcv系列代码
+pip install mmcv-full==1.7.2 -f https://download.openmmlab.com/mmcv/dist/cu12.4/torch2.4.0/index.html
+上面这样多半不行，请从原代码安装
+将sh中的launch改为run
+报错：TypeError: cannot pickle 'dict_keys' object
+解决方法：替换版本
+报错：[rank0]:     if device.type == "cpu":
+[rank0]: AttributeError: 'int' object has no attribute 'type'
+解决方法：修改mmcv,参考这个https://blog.csdn.net/weixin_45716425/article/details/143797917
+
+可视化图片：ffmpeg -r 10 -pattern_type glob -i '*.png' -vf "fps=10,crop=trunc(iw/2)*2:trunc(ih/2)*2" -vcodec libx264 -pix_fmt yuv420p -acodec aac -strict -2 infer_ppt.mp4 -y
+
+2.petrv2训练及测试
+地图分割实验：
+bash tools/dist_train.sh projects/configs/petrv2/petrv2_BEVseg.py 2 --work-dir work_dirs/petr_BEVseg/
+bash tools/dist_test.sh projects/configs/petrv2/petrv2_BEVseg.py work_dirs/petr_BEVseg/epoch_50.pth 2 --eval segm
+（seg上面就可以可视化了）
+可视化用这个：
+bash tools/dist_test.sh projects/configs/petrv2/petrv2_BEVseg.py  work_dirs/petr_BEVseg/epoch_50.pth 2 --out work_dirs/pp-nus/results_eval.pkl --format-only --eval-options 'jsonfile_prefix=work_dirs/pp-nus/results_eval'
+python3 tools/visualize.py
+bash tools/dist_test.sh projects/configs/petrv2/petrv2_BEVseg.py work_dirs/petr_BEVseg/epoch_50.pth 2 --eval bbox
+目标检测实验：
+bash tools/dist_test.sh projects/configs/petrv2/petrv2_vovnet_gridmask_p4_800x320.py ckpts/det_epoch_24.pth 2 --out work_dirs/pp-nus/results_eval.pkl --format-only --eval-options 'jsonfile_prefix=work_dirs/pp-nus/results_eval'
+python3 tools/visualize.py
+

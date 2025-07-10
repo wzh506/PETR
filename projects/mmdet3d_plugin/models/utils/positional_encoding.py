@@ -69,14 +69,14 @@ class SinePositionalEncoding3D(BaseModule):
         # `masks` from bool to int.
         mask = mask.to(torch.int)
         not_mask = 1 - mask  # logical_not
-        n_embed = not_mask.cumsum(1, dtype=torch.float32)
+        n_embed = not_mask.cumsum(1, dtype=torch.float32)#累计求合，实际上得到的就是有限的行号
         y_embed = not_mask.cumsum(2, dtype=torch.float32)
         x_embed = not_mask.cumsum(3, dtype=torch.float32)
         if self.normalize:
             n_embed = (n_embed + self.offset) / \
                       (n_embed[:, -1:, :, :] + self.eps) * self.scale
             y_embed = (y_embed + self.offset) / \
-                      (y_embed[:, :, -1:, :] + self.eps) * self.scale
+                      (y_embed[:, :, -1:, :] + self.eps) * self.scale #找最大的那一维
             x_embed = (x_embed + self.offset) / \
                       (x_embed[:, :, :, -1:] + self.eps) * self.scale
         dim_t = torch.arange(

@@ -13,7 +13,7 @@ import os
 import math
 import cv2
 from collections import OrderedDict
-from nuscenes.nuscenes import NuScenes
+from nuscenes.nuscenes import NuScenes #先用nuscenes进行数据预先处理，然后进行训练
 from nuscenes.utils.geometry_utils import view_points
 from os import path as osp
 from pyquaternion import Quaternion
@@ -662,7 +662,7 @@ def generate_record(ann_rec: dict, x1: float, y1: float, x2: float, y2: float,
 
 
 def get_binimg( nusc, rec):
-        dx, bx, nx = gen_dx_bx([-50.0, 50.0, 0.5], [-50.0, 50.0, 0.5], [-5, 3, 8])
+        dx, bx, nx = gen_dx_bx([-50.0, 50.0, 0.5], [-50.0, 50.0, 0.5], [-5, 3, 8]) #-5到3，步长为8，难道是高度吗（多半是）
         dx, bx, nx = dx.numpy(), bx.numpy(), nx.numpy()
         egopose = nusc.get('ego_pose',
                                 nusc.get('sample_data', rec['data']['LIDAR_TOP'])['ego_pose_token'])
@@ -672,19 +672,19 @@ def get_binimg( nusc, rec):
         for tok in rec['anns']:
             inst = nusc.get('sample_annotation', tok)
             # add category for lyft
-            if not inst['category_name'].split('.')[0] == 'vehicle':
+            if not inst['category_name'].split('.')[0] == 'vehicle': #只标注了vehicle，路上的行人也不做分割了
                 continue
             box = Box(inst['translation'], inst['size'], Quaternion(inst['rotation']))
-            box.translate(trans)
+            box.translate(trans) #从全局坐标系转换到ego坐标系
             box.rotate(rot)
 
-            pts = box.bottom_corners()[:2].T
+            pts = box.bottom_corners()[:2].T #取x,y位置
             pts = np.round(
                 (pts - bx[:2] + dx[:2]/2.) / dx[:2]
-                ).astype(np.int32)
-            pts[:, [1, 0]] = pts[:, [0, 1]]
+                ).astype(np.int32) #转移到BEV坐标系中即可，其实就是ego坐标系然后取round。物理坐标m映射到具体坐标尺寸
+            pts[:, [1, 0]] = pts[:, [0, 1]]  #交换xy顺序，看到了没，交换的是pts的位置，这样会导致所有物体都倾斜了（方向改为朝右）
             cv2.fillPoly(img, [pts], 1.0)
-
+            #ego坐标系车辆在自己，对应到图上位于100,100位置
         return img
 
 
@@ -694,8 +694,8 @@ def obtain_map_info(nusc, nusc_maps, sample, l2e_r_mat, l2e_t, e2g_r_mat, e2g_t,
                     # layer_names=['lane_divider', 'road_divider'],
                     layer_names=['lane_divider', 'road_divider'],
                     thickness=10):
-    """Export 2d annotation from the info file and raw data.
-    """
+    """Export 2d annotation from the info file and raw data. Map only contain drivable area.
+    """ 
     scene = nusc.get('scene', sample['scene_token'])
     log = nusc.get('log', scene['log_token'])
     nusc_map = nusc_maps[log['location']]
@@ -709,9 +709,9 @@ def obtain_map_info(nusc, nusc_maps, sample, l2e_r_mat, l2e_t, e2g_r_mat, e2g_t,
     patch_angle = math.degrees(Quaternion(matrix=l2g_r_mat).yaw_pitch_roll[0])
 
     
-    bin_img = get_binimg (nusc,sample)
-    bin_img=np.rot90(bin_img,3)
-    
+    bin_img = get_binimg(nusc,sample)
+    bin_img=np.rot90(bin_img,3) #最后又转回来了
+    # cv2.imwrite('bin_img.png', (bin_img * 255).astype('uint8'))
     map_mask = nusc_map.get_map_mask(patch_box, patch_angle, layer_names, canvas_size=canvas_size)
     map_mask = map_mask[-2] | map_mask[-1]
     
@@ -719,7 +719,7 @@ def obtain_map_info(nusc, nusc_maps, sample, l2e_r_mat, l2e_t, e2g_r_mat, e2g_t,
     map_mask=map_mask[np.newaxis,:]
     map_mask = map_mask.transpose((2, 1, 0)).squeeze(2)             # (H, W, C)
     map_mask=np.rot90(map_mask,2)
-    
+    # cv2.imwrite('map_mask.png', (map_mask * 255).astype('uint8'))
     
     erode=nusc_map.get_map_mask(patch_box, patch_angle, ['drivable_area'], canvas_size=canvas_size)
     
@@ -737,7 +737,7 @@ def obtain_map_info(nusc, nusc_maps, sample, l2e_r_mat, l2e_t, e2g_r_mat, e2g_t,
     os.makedirs(map_mask_path, exist_ok=True)
     map_mask_path = osp.join(info_prefix, osp.splitext(osp.basename(lidar_path))[0] + '.npz')
     map_mask_path=osp.join(nusc.dataroot, map_mask_path)
-    np.savez_compressed(map_mask_path, map_mask)
+    np.savez_compressed(map_mask_path, map_mask) # 三个值，[000],[100],[110]
     map_info.update({'map_mask': map_mask_path})
     return map_info
 

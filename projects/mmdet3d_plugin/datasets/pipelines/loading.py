@@ -157,10 +157,10 @@ class LoadMapsFromFiles_flattenf200f3(object):
         results['gt_map']=maps
         # maps=rearrange(maps, 'c (h h1) (w w2) -> (h w) c h1 w2 ', h1=16, w2=16)
         maps=maps.reshape(3,200*200)
-        maps[maps>=0.5]=1
+        maps[maps>=0.5]=1 #再次确认，严格来说肯定都是0或1
         maps[maps<0.5]=0
         maps=1-maps
         results['map_shape']=maps.shape
-        results['maps']=maps
-        
+        results['maps']=maps #maps和gt_map是取反的关系
+
         return results

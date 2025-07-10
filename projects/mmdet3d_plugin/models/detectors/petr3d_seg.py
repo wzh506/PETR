@@ -22,6 +22,7 @@ from mmdet3d.models.detectors.mvx_two_stage import MVXTwoStageDetector
 from projects.mmdet3d_plugin.models.utils.grid_mask import GridMask
 import cv2
 import copy
+import os
 # from .dct import ProcessorDCT
 from einops import rearrange
 def IOU (intputs, targets, eps=1e-6):
@@ -34,7 +35,7 @@ def IOU (intputs, targets, eps=1e-6):
 
 @DETECTORS.register_module()
 class Petr3D_seg(MVXTwoStageDetector):
-    """Detr3D."""
+    """Petr3Dv2"""
 
     def __init__(self,
                  use_grid_mask=False,
@@ -91,7 +92,7 @@ class Petr3D_seg(MVXTwoStageDetector):
         for img_feat in img_feats:
             BN, C, H, W = img_feat.size()
             img_feats_reshaped.append(img_feat.view(B, int(BN / B), C, H, W))
-        return img_feats_reshaped
+        return img_feats_reshaped 
 
     @auto_fp16(apply_to=('img'), out_fp32=True)
     def extract_feat(self, img, img_metas):
@@ -106,7 +107,7 @@ class Petr3D_seg(MVXTwoStageDetector):
                           maps,
                           img_metas,
                           gt_bboxes_ignore=None):
-        """Forward function for point cloud branch.
+        """Forward function for point cloud branch.然而这是给img用的，这小子造假
         Args:
             pts_feats (list[torch.Tensor]): Features of point cloud branch
             gt_bboxes_3d (list[:obj:`BaseInstance3DBoxes`]): Ground truth
@@ -228,7 +229,7 @@ class Petr3D_seg(MVXTwoStageDetector):
             n,w=lane_preds.size()
             
             f_lane=lane_preds.sigmoid()
-            f_lane[f_lane>=0.43]=1
+            f_lane[f_lane>=0.43]=1 #阈值，三个类别居然用的同一个阈值
             f_lane[f_lane<0.43]=0
             f_lane_show=copy.deepcopy(f_lane).reshape(3,200,200)
             gt_map_show=copy.deepcopy(gt_map[0])
@@ -243,16 +244,16 @@ class Petr3D_seg(MVXTwoStageDetector):
             ret_ious=[inter,union]
 
 
-            show_res=False
+            show_res=True #是否可视化segmentation
             if show_res:
             
                 pres=gt_map_show[0]
                 
                 gt=torch.zeros(200,200,3)
                 gt+=255
-                label=[[71,130,255],[255,255,0],[255,144,30]]
+                label=[[71,130,255],[255,255,0],[255,144,30]] #就3类物体
                 
-                gt[...,0][pres[0]==1]=label[0][0]
+                gt[...,0][pres[0]==1]=label[0][0] #分别对应即可，优先级从低到高，drivable->lane,road->vehicle
                 gt[...,1][pres[0]==1]=label[0][1]
                 gt[...,2][pres[0]==1]=label[0][2]
                 gt[...,0][pres[2]==1]=label[2][0]
@@ -278,10 +279,11 @@ class Petr3D_seg(MVXTwoStageDetector):
                 pre[...,1][pres[1]==1]=label[1][1]
                 pre[...,2][pres[1]==1]=label[1][2]
                 pre=pre.cpu().numpy()
-                imgss=np.concatenate((pre, gt),axis=1)
-                
+                imgss=np.concatenate((pre, gt),axis=1) #完全没有旋转
+                if not os.path.exists('./res/'):
+                    os.makedirs('./res/')
                 cv2.imwrite('./res/'+img_metas[0]['filename'][0].split('/')[-1].split('.')[0]+'.png',imgss)
-                
+                # 这个好歹是完整的名字img
             
         return ret_ious
 
