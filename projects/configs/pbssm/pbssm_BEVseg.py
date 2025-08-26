@@ -303,7 +303,7 @@ test_pipeline = [
 
 data = dict(
     samples_per_gpu=1,
-    workers_per_gpu=0, #有两个subprocess
+    workers_per_gpu=2, #有两个subprocess
     train=dict(
         type=dataset_type,
         data_root=data_root,
@@ -342,11 +342,12 @@ lr_config = dict(
     min_lr_ratio=1e-3,
     # by_epoch=False
     )
-total_epochs = 50
+total_epochs = 100
 evaluation = dict(interval=50, pipeline=test_pipeline)
 find_unused_parameters=False
-checkpoint_config = dict(interval=1, max_keep_ckpts=1)
+checkpoint_config = dict(interval=1, max_keep_ckpts=100)
 runner = dict(type='EpochBasedRunner', max_epochs=total_epochs)
 load_from='ckpts/fcos3d_vovnet_imgbackbone-remapped.pth'
-resume_from=None
+# resume_from=None
+resume_from='/home/zhaohui1.wang/github/PETR/ckpts/seg_epoch_50.pth'
 

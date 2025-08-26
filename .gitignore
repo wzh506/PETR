@@ -140,3 +140,6 @@ data/sunrgbd/OFFICIAL_SUNRGBD/
 mmdet3d/core/evaluation/waymo_utils/compute_detection_metrics_main
 \res
 \result_vis
+*.png
+*.mp4
+*.tar.gz

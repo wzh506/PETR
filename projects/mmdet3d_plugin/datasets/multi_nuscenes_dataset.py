@@ -340,9 +340,14 @@ class MultiCustomNuScenesDataset(NuScenesDataset):
         # ret_f1=[0,0,0,0,0]
         for i in range(len(results)):
             for tt in range(3):
-                inter[tt]+=results[i]['ret_iou'][0][tt]
-                union[tt]+=results[i]['ret_iou'][1][tt]
-                # ret_f1[tt]+=results[i]['ret_F1'][k[tt]][2]
+                if isinstance(results[i],list):
+                    inter[tt]+=results[i][0]['ret_iou'][0][tt]
+                    union[tt]+=results[i][0]['ret_iou'][1][tt]
+                    # ret_f1[tt]+=results[i][tt]['ret_F1'][k[tt]][2]
+                else:
+                    inter[tt]+=results[i]['ret_iou'][0][tt]
+                    union[tt]+=results[i]['ret_iou'][1][tt]
+                    # ret_f1[tt]+=results[i]['ret_F1'][k[tt]][2]
         n=len(results)
         # print(inter)
         # print(union)

@@ -14,7 +14,7 @@ pip install mmcv-full==1.7.2 -f https://download.openmmlab.com/mmcv/dist/cu12.4/
 2.petrv2训练及测试
 地图分割实验：
 bash tools/dist_train.sh projects/configs/petrv2/petrv2_BEVseg.py 2 --work-dir work_dirs/petr_BEVseg/
-bash tools/dist_test.sh projects/configs/petrv2/petrv2_BEVseg.py work_dirs/petr_BEVseg/epoch_50.pth 2 --eval segm
+bash tools/dist_test.sh projects/configs/petrv2/petrv2_BEVseg.py /home/zhaohui1.wang/github/PETR/ckpts/seg_epoch_50.pth 2 --eval segm
 （seg上面就可以可视化了）
 可视化用这个：
 bash tools/dist_test.sh projects/configs/petrv2/petrv2_BEVseg.py  work_dirs/petr_BEVseg/epoch_50.pth 2 --out work_dirs/pp-nus/results_eval.pkl --format-only --eval-options 'jsonfile_prefix=work_dirs/pp-nus/results_eval'
@@ -23,4 +23,24 @@ bash tools/dist_test.sh projects/configs/petrv2/petrv2_BEVseg.py work_dirs/petr_
 目标检测实验：
 bash tools/dist_test.sh projects/configs/petrv2/petrv2_vovnet_gridmask_p4_800x320.py ckpts/det_epoch_24.pth 2 --out work_dirs/pp-nus/results_eval.pkl --format-only --eval-options 'jsonfile_prefix=work_dirs/pp-nus/results_eval'
 python3 tools/visualize.py
+
+
+
+
+
+3.pbssm训练相关
+
+nohup bash tools/dist_train.sh projects/configs/pbssm/pbssm_BEVseg.py 2 --work-dir work_dirs/pbssm_BEVseg/ >> pbssm_BEVseg.log 2>&1 &
+地图分割实验：
+训练：bash tools/dist_train.sh projects/configs/pbssm/pbssm_BEVseg.py 2 --work-dir work_dirs/pbssm_BEVseg/
+测试和可视化：bash tools/dist_test.sh projects/configs/pbssm/pbssm_BEVseg.py work_dirs/pbssm_BEVseg/epoch_54.pth 2 --eval segm #最合适
+
+nohup bash tools/dist_train.sh projects/configs/pbssm/pbssm_vovnet_gridmask_p4_800x320.py 4 --work-dir work_dirs/pbssm_vovnet_gridmask_p4_800x320/ >> pbssm_BEVdet.log 2>&1 &
+目标检测实验:
+训练：bash tools/dist_train.sh projects/configs/pbssm/pbssm_vovnet_gridmask_p4_800x320.py 2 --work-dir work_dirs/pbssm_vovnet_gridmask_p4_800x320/
+测试和可视化：bash tools/dist_test.sh projects/configs/pbssm/pbssm_vovnet_gridmask_p4_800x320.py work_dirs/pbssm_vovnet_gridmask_p4_800x320/epoch_200.pth 2 --eval bbox
+bash ./tools/dist_test.sh projects/configs/pbssm/pbssm_vovnet_gridmask_p4_800x320.py  work_dirs/pbssm_vovnet_gridmask_p4_800x320/epoch_200.pth 2 --out work_dirs/pbssm/results_eval.pkl --format-only --eval-options 'jsonfile_prefix=work_dirs/pbssm/results_eval'
+python3 tools/visualize.py
+
+
 

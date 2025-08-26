@@ -561,7 +561,8 @@ class PETRHead_seg(AnchorFreeHead):
         outputs_lanes=[]
         for lvl in range(outs_dec_lane.shape[0]): #观看最后的输出
             # 这里三个head注意一下
-            lane_queries_lvl=lane_queries[lvl].view(1,25,25,-1).permute(0,3,1,2)
+            # lane_queries_lvl=lane_queries[lvl].contiguous().view(1,25,25,-1).permute(0,3,1,2)
+            lane_queries_lvl=lane_queries[lvl].reshape(1,25,25,-1).permute(0,3,1,2)
             outputs_dri=self.lane_branches_dri[lvl](lane_queries_lvl) #可行驶区域
             outputs_lan=self.lane_branches_lan[lvl](lane_queries_lvl) #车道线
             outputs_vie=self.lane_branches_vie[lvl](lane_queries_lvl) #车辆

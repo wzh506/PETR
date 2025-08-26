@@ -1,6 +1,3 @@
-from pickle import FALSE
-
-
 _base_ = [
     '../../../mmdetection3d/configs/_base_/datasets/nus-3d.py',
     '../../../mmdetection3d/configs/_base_/default_runtime.py'
@@ -8,36 +5,6 @@ _base_ = [
 backbone_norm_cfg = dict(type='LN', requires_grad=True)
 plugin=True
 plugin_dir='projects/mmdet3d_plugin/'
-
-
-version = 'v1.0-pb'
-#简单替换一下就可以实现
-if version == 'v1.0-mini':
-    info_root = 'HDmaps-final_infos_train.pkl' #z
-    ann_file = 'mmdet3d_nuscenes_30f_infos_train.pkl'
-    lane_ann_file = 'HDmaps-final_infos_train.pkl'
-    val_ann_file = 'mmdet3d_nuscenes_30f_infos_val.pkl'
-    val_lane_file = 'HDmaps-final_infos_val.pkl'
-elif version == 'v1.0-trainval': #
-    info_root = 'HDmaps-final_infos_train.pkl'
-    ann_file = 'mmdet3d_nuscenes_30f_infos_train.pkl'
-    lane_ann_file = 'HDmaps-final_infos_train.pkl'
-    val_ann_file = 'mmdet3d_nuscenes_30f_infos_val.pkl'
-    val_lane_file = 'HDmaps-final_infos_val.pkl'
-elif version == 'v1.0-pb': #说明用的是full!
-    info_root = 'HDmaps-final_infos_val.pkl' #z
-    ann_file = 'mmdet3d_nuscenes_30f_infos_val.pkl'
-    lane_ann_file = 'HDmaps-final_infos_val.pkl'
-    val_ann_file = 'mmdet3d_nuscenes_30f_infos_val.pkl'
-    val_lane_file = 'HDmaps-final_infos_val.pkl'
-else: #说明用的是full!
-    info_root= 'HDmaps-nocover_infos_train.pkl' #这个是加入了val测试集作为训练的pkl，一般情况下用不到这个（除非要上传获得test指标）
-    ann_file = 'mmdet3d_nuscenes_30f_infos_train.pkl'
-    lane_ann_file = 'HDmaps-final_infos_train.pkl'
-    val_ann_file = 'mmdet3d_nuscenes_30f_infos_val.pkl'
-    val_lane_file = 'HDmaps-final_infos_val.pkl'
-    
-
 
 # If point cloud range is changed, the models should also change their point
 # cloud range accordingly
@@ -51,43 +18,39 @@ class_names = [
     'motorcycle', 'bicycle', 'pedestrian', 'traffic_cone'
 ]
 input_modality = dict(
-    use_lidar=True, #what the hell?
+    use_lidar=False,
     use_camera=True,
     use_radar=False,
     use_map=False,
-    use_external=False)
+    use_external=True)
 model = dict(
-    type='Petr3D_seg',
+    type='Petr3D',
     use_grid_mask=True,
     img_backbone=dict(
-        type='VoVNetCP',
+        type='VoVNetCP', ###use checkpoint to save memory, you can use 'VoVNet' instead of 'VoVNetCP' to close checkpoint
         spec_name='V-99-eSE',
         norm_eval=True,
         frozen_stages=-1,
         input_ch=3,
         out_features=('stage4','stage5',)),
     img_neck=dict(
-        type='CPFPN',
+        type='CPFPN',  ###remove unused parameters 
         in_channels=[768, 1024],
         out_channels=256,
         num_outs=2),
     pts_bbox_head=dict(
-        type='PETRHead_seg',
+        type='PETRv2Head',
         num_classes=10,
         in_channels=256,
-        num_query=900,
-        num_lane=625,
-        # blocks=[128,128,64],
-        blocks=[256,256,128],
+        num_query=1500,
         LID=True,
         with_position=True,
         with_multiview=True,
-        with_se=True,
+        with_fpe=True,
         with_time=True,
-        with_multi=False,
+        with_multi=True,
         position_range=[-61.2, -61.2, -10.0, 61.2, 61.2, 10.0],
         code_weights = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-        normedlinear=False,
         transformer=dict(
             type='PETRTransformer',
             decoder=dict(
@@ -110,37 +73,12 @@ model = dict(
                         ],
                     feedforward_channels=2048,
                     ffn_dropout=0.1,
-                    operation_order=('self_attn', 'norm', 'cross_attn', 'norm',
-                                     'ffn', 'norm')),
-            )),
-        transformer_lane=dict(
-            type='PETRTransformer',
-            decoder=dict(
-                type='PETRTransformerDecoder',
-                return_intermediate=True,
-                num_layers=6,
-                transformerlayers=dict(
-                    type='PETRTransformerDecoderLayer',
-                    attn_cfgs=[
-                        dict(
-                            type='MultiheadAttention',
-                            embed_dims=256,
-                            num_heads=8,
-                            dropout=0.1),
-                        dict(
-                            type='PETRMultiheadAttention',
-                            embed_dims=256,
-                            num_heads=8,
-                            dropout=0.1),
-                        ],
-                    feedforward_channels=2048,
-                    ffn_dropout=0.1,
+                    with_cp=True,  ###use checkpoint to save memory
                     operation_order=('self_attn', 'norm', 'cross_attn', 'norm',
                                      'ffn', 'norm')),
             )),
         bbox_coder=dict(
             type='NMSFreeCoder',
-            # type='NMSFreeClsCoder',
             post_center_range=[-61.2, -61.2, -10.0, 61.2, 61.2, 10.0],
             pc_range=point_cloud_range,
             max_num=300,
@@ -152,30 +90,10 @@ model = dict(
             type='FocalLoss',
             use_sigmoid=True,
             gamma=2.0,
-            alpha=0.5,
+            alpha=0.25,
             loss_weight=2.0),
-        loss_dri=dict(
-            type='FocalLoss',
-            use_sigmoid=True,
-            gamma=2.0,
-            alpha=0.5,
-            loss_weight=2.0),
-        loss_lan=dict(
-            type='FocalLoss',
-            use_sigmoid=True,
-            gamma=2.0,
-            alpha=0.5,
-            loss_weight=4.0),
-        loss_veh=dict(
-            type='FocalLoss',
-            use_sigmoid=True,
-            gamma=2.0,
-            alpha=0.5,
-            loss_weight=8.0),
         loss_bbox=dict(type='L1Loss', loss_weight=0.25),
-        loss_iou=dict(type='GIoULoss', loss_weight=0.0),
-        loss_lane_mask=dict(type='Sigmoid_ce_loss', loss_weight=1.0)
-        ),
+        loss_iou=dict(type='GIoULoss', loss_weight=0.0)),
     # model training and testing settings
     train_cfg=dict(pts=dict(
         grid_size=[512, 512, 1],
@@ -184,21 +102,19 @@ model = dict(
         out_size_factor=4,
         assigner=dict(
             type='HungarianAssigner3D',
-            # cls_cost=dict(type='ClassificationCost', weight=2.0),
             cls_cost=dict(type='FocalLossCost', weight=2.0),
             reg_cost=dict(type='BBox3DL1Cost', weight=0.25),
             iou_cost=dict(type='IoUCost', weight=0.0), # Fake cost. This is just to make it compatible with DETR head. 
             pc_range=point_cloud_range))))
 
-dataset_type = 'MultiCustomNuScenesDataset'
-# data_root = '/data/Dataset/nuScenes/'
-data_root = 'data/nuscenes/'
+dataset_type = 'CustomNuScenesDataset'
+data_root = '/data/Dataset/nuScenes/'
 
 file_client_args = dict(backend='disk')
 
 db_sampler = dict(
     data_root=data_root,
-    info_path=data_root + info_root,
+    info_path=data_root + 'nuscenes_dbinfos_train.pkl',
     rate=1.0,
     prepare=dict(
         filter_by_difficulty=[-1],
@@ -231,16 +147,6 @@ db_sampler = dict(
         load_dim=5,
         use_dim=[0, 1, 2, 3, 4],
         file_client_args=file_client_args))
-# ida_aug_conf = {
-#         "resize_lim": (0.47, 0.625),
-#         "final_dim": (320, 800),
-#         "bot_pct_lim": (0.0, 0.0),
-#         "rot_lim": (0.0, 0.0),
-#         "H": 900,
-#         "W": 1600,
-#         # "rand_flip": False,
-#         "rand_flip": True,
-#     }
 ida_aug_conf = {
         "resize_lim": (0.94, 1.25),
         "final_dim": (640, 1600),
@@ -248,40 +154,34 @@ ida_aug_conf = {
         "rot_lim": (0.0, 0.0),
         "H": 900,
         "W": 1600,
-        # "rand_flip": False,
         "rand_flip": True,
     }
 train_pipeline = [
     dict(type='LoadMultiViewImageFromFiles', to_float32=True),
-    dict(type='LoadMapsFromFiles_flattenf200f3'),
     dict(type='LoadMultiViewImageFromMultiSweepsFiles', sweeps_num=1, to_float32=True, pad_empty_sweeps=True, test_mode=False, sweep_range=[3,27]),
-    # dict(type='LoadMultiViewImageFromSweepsFiles', sweeps_num=1, to_float32=True, pad_empty_sweeps=True, is_nori_read=True),
     dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True, with_attr_label=False),
     dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='ObjectNameFilter', classes=class_names),
-    # dict(type='ResizeCropFlipImage', data_aug_conf = ida_aug_conf, training=True),
-    # dict(type='ResizeMultiview3D', img_scale=[(1800, 640), (1800, 900)], multiscale_mode='range', keep_ratio=True),
-    # dict(type='GlobalRotScaleTransImage',
-    #         rot_range=[-0.3925, 0.3925],
-    #         translation_std=[0, 0, 0],
-    #         scale_ratio_range=[0.95, 1.05],
-    #         reverse_angle=True,
-    #         training=True
-    #         ),
+    dict(type='ResizeCropFlipImage', data_aug_conf = ida_aug_conf, training=True),
+    dict(type='GlobalRotScaleTransImage',
+            rot_range=[-0.3925, 0.3925],
+            translation_std=[0, 0, 0],
+            scale_ratio_range=[0.95, 1.05],
+            reverse_angle=True,
+            training=True
+            ),
     dict(type='NormalizeMultiviewImage', **img_norm_cfg),
     dict(type='PadMultiViewImage', size_divisor=32),
     dict(type='DefaultFormatBundle3D', class_names=class_names),
-    dict(type='Collect3D', keys=['gt_bboxes_3d', 'gt_labels_3d', 'img','maps'],
-            meta_keys=('filename', 'ori_shape', 'img_shape', 'lidar2img', 'intrinsics', 'extrinsics','bda',
+    dict(type='Collect3D', keys=['gt_bboxes_3d', 'gt_labels_3d', 'img'],
+            meta_keys=('filename', 'ori_shape', 'img_shape', 'lidar2img', 'intrinsics', 'extrinsics',
                 'pad_shape', 'scale_factor', 'flip', 'box_mode_3d', 'box_type_3d',
                 'img_norm_cfg', 'sample_idx', 'timestamp'))
 ]
 test_pipeline = [
     dict(type='LoadMultiViewImageFromFiles', to_float32=True),
-    dict(type='LoadMapsFromFiles_flattenf200f3'),
-    dict(type='LoadMultiViewImageFromMultiSweepsFiles', sweeps_num=1, to_float32=True, pad_empty_sweeps=True, test_mode=False, sweep_range=[3,27]),
-    # dict(type='ResizeCropFlipImage', data_aug_conf = ida_aug_conf, training=False),
-    # dict(type='ResizeMultiview3D', img_scale= (1600, 800), keep_ratio=True),
+    dict(type='LoadMultiViewImageFromMultiSweepsFiles', sweeps_num=1, to_float32=True, pad_empty_sweeps=True, sweep_range=[3,27]),
+    dict(type='ResizeCropFlipImage', data_aug_conf = ida_aug_conf, training=False),
     dict(type='NormalizeMultiviewImage', **img_norm_cfg),
     dict(type='PadMultiViewImage', size_divisor=32),
     dict(
@@ -294,8 +194,8 @@ test_pipeline = [
                 type='DefaultFormatBundle3D',
                 class_names=class_names,
                 with_label=False),
-            dict(type='Collect3D', keys=['img','gt_map','maps'],
-            meta_keys=('filename', 'ori_shape', 'img_shape', 'lidar2img', 'intrinsics', 'extrinsics','bda',
+            dict(type='Collect3D', keys=['img'],
+            meta_keys=('filename', 'ori_shape', 'img_shape', 'lidar2img', 'intrinsics', 'extrinsics',
                 'pad_shape', 'scale_factor', 'flip', 'box_mode_3d', 'box_type_3d',
                 'img_norm_cfg', 'sample_idx', 'timestamp'))
         ])
@@ -303,23 +203,24 @@ test_pipeline = [
 
 data = dict(
     samples_per_gpu=1,
-    workers_per_gpu=0, #有两个subprocess
+    workers_per_gpu=4,
     train=dict(
-        type=dataset_type,
-        data_root=data_root,
-        
-        ann_file=data_root + ann_file,
-        lane_ann_file=data_root + lane_ann_file,
-        pipeline=train_pipeline,
-        classes=class_names,
-        modality=input_modality,
-        test_mode=False,
-        use_valid_flag=True,
-        # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
-        # and box_type_3d='Depth' in sunrgbd and scannet dataset.
-        box_type_3d='LiDAR'),
-    val=dict(type=dataset_type, pipeline=test_pipeline, ann_file=data_root + val_ann_file,lane_ann_file=data_root + val_lane_file, classes=class_names, modality=input_modality),
-    test=dict(type=dataset_type, pipeline=test_pipeline, ann_file=data_root + val_ann_file,lane_ann_file=data_root + val_lane_file, classes=class_names, modality=input_modality))
+        type='CBGSDataset',
+        dataset=dict(
+            type=dataset_type,
+            data_root=data_root,
+            ann_file=[data_root + 'mmdet3d_nuscenes_30f_infos_train.pkl', data_root + 'mmdet3d_nuscenes_30f_infos_val.pkl'],
+            pipeline=train_pipeline,
+            classes=class_names,
+            modality=input_modality,
+            test_mode=False,
+            use_valid_flag=True,
+            # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
+            # and box_type_3d='Depth' in sunrgbd and scannet dataset.
+            box_type_3d='LiDAR'),
+    ),
+    val=dict(type=dataset_type, pipeline=test_pipeline, ann_file=data_root + 'mmdet3d_nuscenes_30f_infos_val.pkl', classes=class_names, modality=input_modality),
+    test=dict(type=dataset_type, pipeline=test_pipeline, ann_file=data_root + 'mmdet3d_nuscenes_30f_infos_test.pkl', classes=class_names, modality=input_modality))
 
 
 optimizer = dict(
@@ -340,13 +241,37 @@ lr_config = dict(
     warmup_iters=500,
     warmup_ratio=1.0 / 3,
     min_lr_ratio=1e-3,
-    # by_epoch=False
     )
-total_epochs = 50
-evaluation = dict(interval=50, pipeline=test_pipeline)
-find_unused_parameters=False
-checkpoint_config = dict(interval=1, max_keep_ckpts=1)
+total_epochs = 24
+evaluation = dict(interval=24, pipeline=test_pipeline)
+find_unused_parameters=False #### when use checkpoint, find_unused_parameters must be False
+checkpoint_config = dict(interval=1, max_keep_ckpts=3)
 runner = dict(type='EpochBasedRunner', max_epochs=total_epochs)
-load_from='ckpts/fcos3d_vovnet_imgbackbone-remapped.pth'
+load_from='ckpts/dd3d_det_final.pth'
 resume_from=None
+
+
+# Evaluating bboxes of pts_bbox
+# add center
+# mAP: 0.8412
+# mATE: 0.3252
+# mASE: 0.1556
+# mAOE: 0.0708
+# mAVE: 0.1758
+# mAAE: 0.1784
+# NDS: 0.8300
+# Eval time: 192.6s
+
+# Per-class results:
+# Object Class    AP      ATE     ASE     AOE     AVE     AAE
+# car     0.863   0.256   0.119   0.033   0.177   0.196
+# truck   0.840   0.309   0.124   0.031   0.145   0.215
+# bus     0.845   0.344   0.125   0.031   0.268   0.210
+# trailer 0.779   0.430   0.135   0.042   0.111   0.095
+# construction_vehicle    0.799   0.410   0.196   0.062   0.135   0.306
+# pedestrian      0.815   0.370   0.212   0.195   0.196   0.141
+# motorcycle      0.826   0.340   0.166   0.098   0.257   0.241
+# bicycle 0.880   0.276   0.182   0.093   0.117   0.023
+# traffic_cone    0.884   0.238   0.174   nan     nan     nan
+# barrier 0.881   0.280   0.122   0.052   nan     nan
 

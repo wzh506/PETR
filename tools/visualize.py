@@ -3,9 +3,9 @@ import tqdm
 import json
 from visual_nuscenes import NuScenes
 #可以把GT画上吧
-use_gt = True
+use_gt = False
 out_dir = './result_vis/'
-result_json = "work_dirs/pp-nus/results_eval/pts_bbox/results_nusc"
+result_json = "work_dirs/pbssm/results_eval/pts_bbox/results_nusc"
 dataroot='./data/nuscenes'
 if not os.path.exists(out_dir):
     os.mkdir(out_dir)
