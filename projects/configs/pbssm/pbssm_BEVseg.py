@@ -343,11 +343,12 @@ lr_config = dict(
     # by_epoch=False
     )
 total_epochs = 100
-evaluation = dict(interval=50, pipeline=test_pipeline)
+evaluation = dict(interval=10, pipeline=test_pipeline)
 find_unused_parameters=False
-checkpoint_config = dict(interval=1, max_keep_ckpts=100)
+checkpoint_config = dict(interval=1, max_keep_ckpts=10)
 runner = dict(type='EpochBasedRunner', max_epochs=total_epochs)
 load_from='ckpts/fcos3d_vovnet_imgbackbone-remapped.pth'
 # resume_from=None
 resume_from='/home/zhaohui1.wang/github/PETR/ckpts/seg_epoch_50.pth'
+auto_resume=True
 

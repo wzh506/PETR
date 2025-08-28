@@ -72,6 +72,24 @@ class MultiCustomNuScenesDataset(NuScenesDataset):
         """
         info = self.data_infos[index]
         lane_info=self.lane_infos[index]
+        def replace_path_in_dict(d):
+            if isinstance(d, dict):
+                for k, v in d.items():
+                    if isinstance(v, str) and '/data/Dataset/nuScenes/' in v:
+                        d[k] = v.replace('/data/Dataset/nuScenes/', self.data_root)
+                    elif isinstance(v, (dict, list)):
+                        replace_path_in_dict(v)
+            elif isinstance(d, list):
+                for i, item in enumerate(d):
+                    if isinstance(item, str) and '/data/Dataset/nuScenes/' in item:
+                        d[i] = item.replace('/data/Dataset/nuScenes/', self.data_root)
+                    elif isinstance(item, (dict, list)):
+                        replace_path_in_dict(item)
+        
+        # 对 info 和 lane_info 执行路径替换
+        replace_path_in_dict(info)
+        replace_path_in_dict(lane_info)
+    
         # standard protocal modified from SECOND.Pytorch
         input_dict = dict(
             sample_idx=info['token'],

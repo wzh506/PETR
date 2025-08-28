@@ -30,15 +30,15 @@ python3 tools/visualize.py
 
 3.pbssm训练相关
 
-nohup bash tools/dist_train.sh projects/configs/pbssm/pbssm_BEVseg.py 2 --work-dir work_dirs/pbssm_BEVseg/ >> pbssm_BEVseg.log 2>&1 &
-地图分割实验：
-训练：bash tools/dist_train.sh projects/configs/pbssm/pbssm_BEVseg.py 2 --work-dir work_dirs/pbssm_BEVseg/
-测试和可视化：bash tools/dist_test.sh projects/configs/pbssm/pbssm_BEVseg.py work_dirs/pbssm_BEVseg/epoch_54.pth 2 --eval segm #最合适
+nohup bash tools/dist_train.sh projects/configs/pbssm/pbssm_BEVseg.py 4 --work-dir work_dirs/pbssm_BEVseg_0827/ >> pbssm_BEVseg_0827.log 2>&1 &
+地图分割实：
+训练：bash tools/dist_train.sh projects/configs/pbssm/pbssm_BEVseg.py 2 --work-dir work_dirs/pbssm_BEVseg_0827/
+测试和可视化：bash tools/dist_test.sh projects/configs/pbssm/pbssm_BEVseg.py work_dirs/pbssm_BEVseg_0827/epoch_54.pth 2 --eval segm #最合适
 
-nohup bash tools/dist_train.sh projects/configs/pbssm/pbssm_vovnet_gridmask_p4_800x320.py 4 --work-dir work_dirs/pbssm_vovnet_gridmask_p4_800x320/ >> pbssm_BEVdet.log 2>&1 &
+nohup bash tools/dist_train.sh projects/configs/pbssm/pbssm_vovnet_gridmask_p4_800x320.py 4 --work-dir work_dirs/pbssm_vovnet_gridmask_p4_800x320_0827/ >> pbssm_BEVdet_0827.log 2>&1 &
 目标检测实验:
-训练：bash tools/dist_train.sh projects/configs/pbssm/pbssm_vovnet_gridmask_p4_800x320.py 2 --work-dir work_dirs/pbssm_vovnet_gridmask_p4_800x320/
-测试和可视化：bash tools/dist_test.sh projects/configs/pbssm/pbssm_vovnet_gridmask_p4_800x320.py work_dirs/pbssm_vovnet_gridmask_p4_800x320/epoch_200.pth 2 --eval bbox
+训练：bash tools/dist_train.sh projects/configs/pbssm/pbssm_vovnet_gridmask_p4_800x320.py 2 --work-dir work_dirs/pbssm_vovnet_gridmask_p4_800x320_0827/
+测试和可视化：bash tools/dist_test.sh projects/configs/pbssm/pbssm_vovnet_gridmask_p4_800x320.py work_dirs/pbssm_vovnet_gridmask_p4_800x320_0827/epoch_200.pth 2 --eval bbox
 bash ./tools/dist_test.sh projects/configs/pbssm/pbssm_vovnet_gridmask_p4_800x320.py  work_dirs/pbssm_vovnet_gridmask_p4_800x320/epoch_200.pth 2 --out work_dirs/pbssm/results_eval.pkl --format-only --eval-options 'jsonfile_prefix=work_dirs/pbssm/results_eval'
 python3 tools/visualize.py
 

@@ -580,11 +580,12 @@ class NuScenes:
                       filter_lidarseg_labels: List = None,
                       lidarseg_preds_bin_path: str = None,
                       verbose: bool = True,
-                      show_panoptic: bool = False) -> None:
+                      show_panoptic: bool = False,
+                      with_anns=False) -> None:
         self.explorer.render_sample(sample_token, box_vis_level, nsweeps=nsweeps, out_path=out_path,
                                     show_lidarseg=show_lidarseg, filter_lidarseg_labels=filter_lidarseg_labels,
                                     lidarseg_preds_bin_path=lidarseg_preds_bin_path, verbose=verbose,
-                                    show_panoptic=show_panoptic)
+                                    show_panoptic=show_panoptic,with_anns=with_anns)
 
     def render_sample_data(self, sample_data_token: str, with_anns: bool = True,
                            box_vis_level: BoxVisibility = BoxVisibility.ANY, axes_limit: float = 40, ax: Axes = None,
@@ -1111,7 +1112,8 @@ class NuScenesExplorer:
                       filter_lidarseg_labels: List = None,
                       lidarseg_preds_bin_path: str = None,
                       verbose: bool = True,
-                      show_panoptic: bool = False) -> None:
+                      show_panoptic: bool = False,
+                      with_anns:bool=True) -> None:
         """
         Render all LIDAR and camera sample_data in sample along with annotations.
         :param token: Sample token.
@@ -1152,21 +1154,32 @@ class NuScenesExplorer:
         # cols = 3
         fig, axes = plt.subplots(int(np.ceil(n / cols)), cols, figsize=(16, 24))
 
-        # Plot radars into a single subplot.
+        # Plot radars into a single subplot.HERE
+        
         if len(radar_data) > 0:
             ax = axes[0, 0]
             for i, (_, sd_token) in enumerate(radar_data.items()):
-                self.render_sample_data(sd_token, with_anns=i == 0, box_vis_level=box_vis_level, ax=ax, nsweeps=nsweeps,
-                                        verbose=False)
+                if with_anns:
+                    self.render_sample_data(sd_token, with_anns=i == 0, box_vis_level=box_vis_level, ax=ax, nsweeps=nsweeps,
+                                            verbose=False)
+                else:
+                    self.render_sample_data(sd_token, with_anns=False, box_vis_level=box_vis_level, ax=ax, nsweeps=nsweeps,
+                        verbose=False)
             ax.set_title('Fused RADARs')
 
         # Plot lidar into a single subplot.
         if len(lidar_data) > 0:
             for (_, sd_token), ax in zip(lidar_data.items(), axes.flatten()[num_radar_plots:]):
-                self.render_sample_data(sd_token, box_vis_level=box_vis_level, ax=ax, nsweeps=nsweeps,
-                                        show_lidarseg=show_lidarseg, filter_lidarseg_labels=filter_lidarseg_labels,
-                                        lidarseg_preds_bin_path=lidarseg_preds_bin_path, verbose=False,
-                                        show_panoptic=show_panoptic)
+                if with_anns:
+                    self.render_sample_data(sd_token, box_vis_level=box_vis_level, ax=ax, nsweeps=nsweeps,
+                                            show_lidarseg=show_lidarseg, filter_lidarseg_labels=filter_lidarseg_labels,
+                                            lidarseg_preds_bin_path=lidarseg_preds_bin_path, verbose=False,
+                                            show_panoptic=show_panoptic)
+                else:
+                    self.render_sample_data(sd_token, with_anns=False,box_vis_level=box_vis_level, ax=ax, nsweeps=nsweeps,
+                        show_lidarseg=show_lidarseg, filter_lidarseg_labels=filter_lidarseg_labels,
+                        lidarseg_preds_bin_path=lidarseg_preds_bin_path, verbose=False,
+                        show_panoptic=show_panoptic)
 
         # Plot cameras in separate subplots.
         for (_, sd_token), ax in zip(camera_data.items(), axes.flatten()[num_radar_plots + num_lidar_plots:]):
@@ -1185,9 +1198,13 @@ class NuScenesExplorer:
                                                 ax=ax, verbose=False,
                                                 lidarseg_preds_bin_path=lidarseg_preds_bin_path,
                                                 show_panoptic=show_panoptic)
-            else:
-                self.render_sample_data(sd_token, box_vis_level=box_vis_level, ax=ax, nsweeps=nsweeps,
-                                        show_lidarseg=False, verbose=False)
+            else: #HERE
+                if with_anns:
+                    self.render_sample_data(sd_token, box_vis_level=box_vis_level, ax=ax, nsweeps=nsweeps,
+                                            show_lidarseg=False, verbose=False)
+                else:
+                    self.render_sample_data(sd_token, box_vis_level=box_vis_level,with_anns=False, ax=ax, nsweeps=nsweeps,
+                        show_lidarseg=False, verbose=False)
 
         # Change plot settings and write to disk.
         axes.flatten()[-1].axis('off')
@@ -2136,6 +2153,34 @@ class NuScenesExplorer:
                                            'but only {} keyframes were processed'.format(total_num_samples, i)
             out.release()
 
+    def render_raw_image(self, sample_data_token: str, out_path: str = None, verbose: bool = True):
+        """
+        只渲染原始图像，不添加任何标注或点云投影
+        :param sample_data_token: 样本数据的token
+        :param out_path: 可选的输出路径
+        :param verbose: 是否显示图像
+        """
+        sd_record = self.nusc.get('sample_data', sample_data_token)
+        if sd_record['sensor_modality'] != 'camera':
+            print("Error: 只能渲染相机图像")
+            return
+            
+        # 加载图像
+        data_path = self.nusc.get_sample_data_path(sample_data_token)
+        im = cv2.imread(data_path)
+        
+        # 显示图像
+        if verbose:
+            plt.figure(figsize=(10, 6))
+            plt.imshow(cv2.cvtColor(im, cv2.COLOR_BGR2RGB))
+            plt.axis('off')
+            plt.title(sd_record['channel'])
+            plt.show()
+            
+        # 保存图像
+        if out_path is not None:
+            cv2.imwrite(out_path, im)
+        
     def render_scene_lidarseg(self,
                               scene_token: str,
                               out_path: str = None,

@@ -3,7 +3,8 @@ import tqdm
 import json
 from visual_nuscenes import NuScenes
 #可以把GT画上吧
-use_gt = False
+use_gt = True
+render_original = True
 out_dir = './result_vis_original/'
 result_json = "work_dirs/pbssm/results_eval/pts_bbox/results_nusc"
 dataroot='./data/nuscenes'
@@ -21,8 +22,12 @@ with open('{}.json'.format(result_json)) as f:
 tokens = list(table['results'].keys())
 
 for token in tqdm.tqdm(tokens[:100]):
-    if use_gt:
-        nusc.render_sample(token, out_path = "./result_vis/"+token+"_gt.png", verbose=False)
+    if render_original:
+        nusc.render_sample(token, out_path = out_dir+token+"_gt.png", verbose=False, with_anns=False)
     else:
-        nusc.render_sample(token, out_path = "./result_vis/"+token+"_pred.png", verbose=False)
+        if use_gt:
+            nusc.render_sample(token, out_path = out_dir+token+"_gt.png", verbose=False)
+        else:
+            nusc.render_sample(token, out_path = out_dir+token+"_pred.png", verbose=False)
+    
 
