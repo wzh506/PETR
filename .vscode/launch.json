@@ -1,0 +1,132 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "PETRv2 单卡训练 BEVseg",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/tools/train.py",
+            "args": [
+                "projects/configs/petrv2/petrv2_BEVseg.py",
+                "--work-dir",
+                "work_dirs/petr_BEVseg/"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}:${env:PYTHONPATH}"
+            },
+            "console": "integratedTerminal"
+        },
+
+        {
+            "name": "PBSSM 单卡训练 BEVseg",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/tools/train.py",
+            "args": [
+                "projects/configs/pbssm/pbssm_BEVseg.py",
+                "--work-dir",
+                "work_dirs/pbssm_BEVseg_0827/"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}:${env:PYTHONPATH}"
+            },
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "PBSSM 单卡测试 BEVseg",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/tools/test.py",
+            "args": [
+                "projects/configs/pbssm/pbssm_BEVseg.py",
+                "work_dirs/pbssm_BEVseg_0827/latest.pth",
+                "--eval",
+                "segm"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}:${env:PYTHONPATH}"
+            },
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "PETRv2 单卡测试 BEVseg",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/tools/test.py",
+            "args": [
+                "projects/configs/petrv2/petrv2_BEVseg.py",
+                "work_dirs/petr_BEVseg/epoch_50.pth",
+                "--eval",
+                "segm"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}:${env:PYTHONPATH}"
+            },
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "PETRv2 单卡可视化 BEVseg",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/tools/test.py",
+            "args": [
+                "projects/configs/petrv2/petrv2_BEVseg.py",
+                "work_dirs/petr_BEVseg/epoch_50.pth",
+                "--eval",
+                "segm"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}:${env:PYTHONPATH}"
+            },
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "PETRv2 单卡训练 BEVdet",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/tools/train.py",
+            "args": [
+                "projects/configs/petrv2/petrv2_vovnet_gridmask_p4_800x320.py",
+                "--work-dir",
+                "work_dirs/petr_r50dcn_gridmask_p4/"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}:${env:PYTHONPATH}"
+            },
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "PETRv2 单卡测试 BEVdet",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/tools/test.py",
+            "args": [
+                "projects/configs/petrv2/petrv2_vovnet_gridmask_p4_800x320.py",
+                "--work-dir",
+                "work_dirs/petr_r50dcn_gridmask_p4/"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}:${env:PYTHONPATH}"
+            },
+            "console": "integratedTerminal"
+        },
+                {
+            "name": "PETRv2 单卡测试 visualize",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/tools/visualize.py",
+            "args": [
+                // "projects/configs/petrv2/petrv2_vovnet_gridmask_p4_800x320.py",
+                // "--work-dir",
+                // "work_dirs/petr_r50dcn_gridmask_p4/"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}:${env:PYTHONPATH}"
+            },
+            "console": "integratedTerminal"
+        },
+    ]
+}

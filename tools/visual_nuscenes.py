@@ -581,7 +581,7 @@ class NuScenes:
                       lidarseg_preds_bin_path: str = None,
                       verbose: bool = True,
                       show_panoptic: bool = False,
-                      with_anns=False) -> None:
+                      with_anns=True) -> None:
         self.explorer.render_sample(sample_token, box_vis_level, nsweeps=nsweeps, out_path=out_path,
                                     show_lidarseg=show_lidarseg, filter_lidarseg_labels=filter_lidarseg_labels,
                                     lidarseg_preds_bin_path=lidarseg_preds_bin_path, verbose=verbose,
@@ -1211,6 +1211,7 @@ class NuScenesExplorer:
         plt.tight_layout()
         fig.subplots_adjust(wspace=0, hspace=0)
 
+        # out_path = ''
         if out_path is not None:
             plt.savefig(out_path)
 

@@ -211,6 +211,8 @@ class Petr3D_seg(MVXTwoStageDetector):
 
     
     def forward_test(self, img_metas,gt_map, maps,img=None, **kwargs):
+        # breakpoint()
+        # 偷偷把GT绘制下来！
         for var, name in [(img_metas, 'img_metas')]:
             if not isinstance(var, list):
                 raise TypeError('{} must be a list, but got {}'.format(
@@ -284,7 +286,80 @@ class Petr3D_seg(MVXTwoStageDetector):
                     os.makedirs('./res/')
                 cv2.imwrite('./res/'+img_metas[0]['filename'][0].split('/')[-1].split('.')[0]+'.png',imgss)
                 # 这个好歹是完整的名字img
-            
+                # 获得名字的方法img_metas[0]['filename'][0].split('/')[-1].split('.')[0]+'.png'
+                
+                img1 = cv2.imread(img_metas[0]['filename'][0])
+                img2 = cv2.imread(img_metas[0]['filename'][1])
+                img3 = cv2.imread(img_metas[0]['filename'][2])
+                img4 = cv2.imread(img_metas[0]['filename'][3])
+                img5 = cv2.imread(img_metas[0]['filename'][4])
+                img6 = cv2.imread(img_metas[0]['filename'][5])
+
+                # 获取imgss和相机图像的尺寸
+                imgss_height, imgss_width = imgss.shape[:2]  # 200, 400, 3
+                img_height, img_width = img1.shape[:2]  # 900, 1600, 3
+
+                # 将6张相机图像调整为合适的尺寸
+                scale_factor = 0.15  # 缩放为原来的1/4
+                small_width = int(img_width * scale_factor)
+                small_height = int(img_height * scale_factor)
+
+                small_img1 = cv2.resize(img1, (small_width, small_height))
+                small_img2 = cv2.resize(img2, (small_width, small_height))
+                small_img3 = cv2.resize(img3, (small_width, small_height))
+                small_img4 = cv2.resize(img4, (small_width, small_height))
+                small_img5 = cv2.resize(img5, (small_width, small_height))
+                small_img6 = cv2.resize(img6, (small_width, small_height))
+
+                # 创建一个白色背景的大图像
+                total_width = max(imgss_width, small_width * 3)
+                total_height = imgss_height + small_height * 2
+
+                # 创建白色背景画布
+                combined_image = np.ones((total_height, total_width, 3), dtype=np.uint8) * 255
+
+                # 计算imgss水平居中的起始位置
+                imgss_start_x = (total_width - imgss_width) // 2
+
+                # 将imgss放在第一行的中间位置
+                combined_image[:imgss_height, imgss_start_x:imgss_start_x+imgss_width] = imgss
+
+                # 将缩小的相机图像放在第二行和第三行
+                # 第二行
+                row2_start = imgss_height
+                combined_image[row2_start:row2_start+small_height, :small_width] = small_img1
+                combined_image[row2_start:row2_start+small_height, small_width:small_width*2] = small_img2
+                combined_image[row2_start:row2_start+small_height, small_width*2:small_width*3] = small_img3
+
+                # 第三行
+                row3_start = imgss_height + small_height
+                combined_image[row3_start:row3_start+small_height, :small_width] = small_img4
+                combined_image[row3_start:row3_start+small_height, small_width:small_width*2] = small_img5
+                combined_image[row3_start:row3_start+small_height, small_width*2:small_width*3] = small_img6
+
+                # 添加文本标注
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                font_scale = 0.7
+                font_thickness = 2
+                font_color = (0, 0, 0)  # 黑色文本
+
+                # 在imgss左上角添加"Pred"标签
+                cv2.putText(combined_image, "Pred", (imgss_start_x + 10, 30), 
+                            font, font_scale, font_color, font_thickness)
+
+                # 在imgss右侧（GT部分）上方添加"GT"标签
+                gt_text_x = imgss_start_x + imgss_width // 2 + 10  # GT图像中间位置
+                cv2.putText(combined_image, "GT", (gt_text_x, 30), 
+                            font, font_scale, font_color, font_thickness)
+
+                # 在img1左上角添加"Multi-view camera"标签
+                cv2.putText(combined_image, "Multi-view camera", (10, row2_start + 30), 
+                            font, font_scale, font_color, font_thickness)
+
+                # 保存拼接后的图像
+                save_path = './res_video/'+img_metas[0]['filename'][0].split('/')[-1].split('.')[0]+'_combined.png'
+                cv2.imwrite(save_path, combined_image)
+                
         return ret_ious
 
 
